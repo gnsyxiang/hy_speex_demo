@@ -56,6 +56,8 @@ void HySpeexAecDestroy(void **handle)
 
     speex_echo_state_destroy(context->st);
     speex_preprocess_state_destroy(context->den);
+
+    HY_FREE(handle);
 }
 
 void *HySpeexAecCreate(HySpeexAecConfig_t *aec_config)
@@ -79,6 +81,8 @@ void *HySpeexAecCreate(HySpeexAecConfig_t *aec_config)
 
         return context;
     } while (0);
+
+    HySpeexAecDestroy((void **)&context);
 
     return NULL;
 }
