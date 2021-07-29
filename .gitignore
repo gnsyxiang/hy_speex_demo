@@ -84,7 +84,7 @@ hy_speex_demo.pc
 *.lo
 *.la
 
-example/main
-example/test
+example/client
+example/server
 
 

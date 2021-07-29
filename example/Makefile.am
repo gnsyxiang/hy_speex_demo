@@ -56,11 +56,19 @@ endif
 
 _ldadd_com      += $(top_builddir)/src/lib@project_name@.la
 
-bin_PROGRAMS    += main
-main_SOURCES    = $(_sources_com) main.c
-main_CPPFLAGS   = $(_cppflags_com)
-main_CFLAGS     = $(_cflags_com)
-main_CXXFLAGS   = $(_cxxflags_com)
-main_LDFLAGS    = $(_ldflags_com)
-main_LDADD      = $(_ldadd_com)
+bin_PROGRAMS        += client
+client_SOURCES      = $(_sources_com) client.c
+client_CPPFLAGS     = $(_cppflags_com)
+client_CFLAGS       = $(_cflags_com)
+client_CXXFLAGS     = $(_cxxflags_com)
+client_LDFLAGS      = $(_ldflags_com)
+client_LDADD        = $(_ldadd_com)
+
+bin_PROGRAMS        += server
+server_SOURCES      = $(_sources_com) server.c
+server_CPPFLAGS     = $(_cppflags_com)
+server_CFLAGS       = $(_cflags_com)
+server_CXXFLAGS     = $(_cxxflags_com)
+server_LDFLAGS      = $(_ldflags_com)
+server_LDADD        = $(_ldadd_com)
 
