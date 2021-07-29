@@ -44,6 +44,7 @@ AC_PROG_MKDIR_P
 # Checks for libraries.
 
 # Checks for header files.
+AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 
@@ -55,5 +56,6 @@ AC_CONFIG_FILES([Makefile
                  example/Makefile
                  include/Makefile
                  res/Makefile
+                 res/config/Makefile
                  src/Makefile])
 AC_OUTPUT

@@ -5,7 +5,7 @@
 # @file    Makefile.am
 # @brief   
 # @author  gnsyxiang <gnsyxiang@163.com>
-# @date    08/03 2021 08:16
+# @date    03/06 2021 10:22
 # @version v0.0.1
 # 
 # @since    note
@@ -13,23 +13,18 @@
 # 
 #     change log:
 #     NO.     Author              Date            Modified
-#     00      zhenquan.qiu        08/03 2021      create the file
+#     00      zhenquan.qiu        03/06 2021      create the file
 # 
-#     last modified: 08/03 2021 08:16
+#     last modified: 03/06 2021 10:22
 # ===============================================================
-
-SUBDIRS = config
 
 # ------------------
 # defining variables
 # ------------------
-_dist_file_com  =
+configdir = $(prefix)/res/config
 
-# ---------------
-# make dist files
-# ---------------
-_dist_file_com  += \
-                   Doxyfile \
-                   get_project_info.sh
-EXTRA_DIST      = $(_dist_file_com)
+# ------------------
+# make install files
+# ------------------
+config_DATA = log4cplus.rc
 
