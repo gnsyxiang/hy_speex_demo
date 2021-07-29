@@ -40,8 +40,8 @@ static void _module_destroy(_main_context_t **context_pp)
 
     // note: 增加或删除要同步到module_create_t中
     module_destroy_t module[] = {
-        {"log",     &context->log_handle,   HyLogDestroy},
         {"aec",     &context->aec_handle,   HySpeexAecDestroy},
+        {"log",     &context->log_handle,   HyLogDestroy},
     };
 
     RUN_DESTROY(module);
@@ -90,7 +90,6 @@ int main(int argc, char const* argv[])
 
     if (argc != 4) {
         LOGE("./client mic_signal.sw speaker_signal.sw output.sw\n");
-
         return -1;
     }
 

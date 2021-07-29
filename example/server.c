@@ -18,6 +18,7 @@
  *     last modified: 18/03 2021 20:22
  */
 #include <stdio.h>
+#include <unistd.h>
 
 #include "hy_utils/hy_module.h"
 #include "hy_utils/hy_mem.h"
@@ -74,6 +75,10 @@ int main(int argc, char const* argv[])
     if (!context) {
         LOGE("_module_create faild \n");
         return -1;
+    }
+
+    while (1) {
+        sleep(1);
     }
 
     _module_destroy(&context);

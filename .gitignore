@@ -83,6 +83,7 @@ hy_speex_demo.pc
 *.o
 *.lo
 *.la
+*.log
 
 example/client
 example/server

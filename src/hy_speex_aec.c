@@ -66,13 +66,13 @@ void *HySpeexAecCreate(HySpeexAecConfig_t *aec_config)
         context = (_speex_aec_context_t *)HY_MALLOC_BREAK(sizeof(*context));
 
         context->st = speex_echo_state_init(aec_config->frame_size, aec_config->filter_length);
-        if (context->st) {
+        if (!context->st) {
             LOGE("speex_echo_state_init faild \n");
             break;
         }
 
         context->den = speex_preprocess_state_init(aec_config->frame_size, aec_config->sample_rate);
-        if (context->den) {
+        if (!context->den) {
             LOGE("speex_preprocess_state_init faild \n");
             break;
         }
