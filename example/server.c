@@ -19,8 +19,6 @@
  */
 #include <stdio.h>
 
-#include "module_a.h"
-
 #include "hy_utils/hy_module.h"
 #include "hy_utils/hy_mem.h"
 #include "hy_utils/hy_log.h"

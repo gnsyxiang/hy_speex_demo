@@ -50,6 +50,10 @@ _cxxflags_com   += $(CXXFLAGS_COM)
 
 _ldflags_com    += $(BIN_LDFLAGS_COM)
 
+if COMPILE_SPEEXDSP
+_ldadd_com      += $(SPEEXDSP_LIBS)
+endif
+
 if COMPILE_LIBHY_UTILS
 _ldadd_com      += $(HY_UTILS_LIBS)
 endif
