@@ -44,8 +44,8 @@ typedef enum {
 } HyNetState_t;
 
 typedef struct {
-    void (*state_cb)(hy_s32_t state, void *args);
-    void (*data_cb)(void *data, size_t len, void *args);
+    void (*state_cb)(HyNetState_t state, void *args);
+    void (*data_cb)(void *buf, size_t len, void *args);
     void *args;
 } HyNetConfigSave_t;
 

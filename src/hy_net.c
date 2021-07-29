@@ -37,12 +37,12 @@
 #define _NET_STATE_CB(context, state)                           \
     do {                                                        \
         if (context && context->config_save.state_cb) {         \
-            context->cb.state_cb(state, context->cb.args);      \
+            context->config_save.state_cb(state, context->config_save.args); \
         }                                                       \
     } while (0)
 
 typedef struct {
-    HyNetConfigSave_t config_save;
+    HyNetConfigSave_t   config_save;
 
     struct event_base   *base;
     struct bufferevent  *bev;
@@ -51,7 +51,10 @@ typedef struct {
 
 hy_s32_t HyNetWrite(void *handle, void *buf, hy_u32_t len)
 {
-    return 0;
+    HY_ASSERT_NULL_RET_VAL(!handle || !buf, -1);
+    _net_context_t *context = handle;
+
+    return bufferevent_write(context->bev, buf, len);
 }
 
 static void _socket_read_cb(struct bufferevent *bev, void *arg)
@@ -173,7 +176,9 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
 
 void HyNetDestroy(void **handle)
 {
+    LOGT("%s:%d \n", __func__, __LINE__);
     HY_ASSERT_NULL_RET(!handle || !*handle);
+
     _net_context_t *context = *handle;
 
     _libevent_destroy(context);
@@ -183,7 +188,9 @@ void HyNetDestroy(void **handle)
 
 void *HyNetCreate(HyNetConfig_t *net_config)
 {
+    LOGT("%s:%d \n", __func__, __LINE__);
     HY_ASSERT_NULL_RET_VAL(!net_config, NULL);
+
     _net_context_t *context = NULL;
 
     do {
@@ -198,6 +205,8 @@ void *HyNetCreate(HyNetConfig_t *net_config)
 
         return context;
     } while (0);
+
+    HyNetDestroy((void **)&context);
 
     return NULL;
 }
