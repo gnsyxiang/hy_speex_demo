@@ -52,6 +52,13 @@ static void _net_state_cb(HyNetState_t state, void *args)
     context->net_state = state;
 }
 
+static void _net_signal_cb(hy_s32_t fd, void *args)
+{
+    LOGD("fd: %d \n", fd);
+
+    exit(1);
+}
+
 static void _module_destroy(_main_context_t **context_pp)
 {
     _main_context_t *context = *context_pp;
@@ -86,9 +93,10 @@ static _main_context_t *_module_create(void)
     net_config.ip               = "192.168.1.57";
     net_config.port             = 7809;
     net_config.type             = HY_NET_TYPE_CLIENT;
-    net_config.config_save.data_cb  = _net_data_cb;
-    net_config.config_save.state_cb = _net_state_cb;
-    net_config.config_save.args     = context;
+    net_config.config_save.data_cb      = _net_data_cb;
+    net_config.config_save.state_cb     = _net_state_cb;
+    net_config.config_save.signal_cb    = _net_signal_cb;
+    net_config.config_save.args         = context;
 
     // note: 增加或删除要同步到module_destroy_t中
     module_create_t module[] = {

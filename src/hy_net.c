@@ -18,6 +18,7 @@
  *     last modified: 29/07 2021 11:04
  */
 #include <stdio.h>
+#include <signal.h>
 #include <pthread.h>
 
 #include "hy_net.h"
@@ -34,6 +35,8 @@
 
 #define ALONE_DEBUG 1
 
+#define _TEST_SIGNAL
+
 #define _NET_STATE_CB(context, state)                           \
     do {                                                        \
         if (context && context->config_save.state_cb) {         \
@@ -47,6 +50,7 @@ typedef struct {
     struct event_base   *base;
     struct bufferevent  *bev;
     pthread_t           id;
+    struct event        **signal_ev;
 } _net_context_t;
 
 hy_s32_t HyNetWrite(void *handle, void *buf, hy_u32_t len)
@@ -93,7 +97,7 @@ static void _socket_event_cb(struct bufferevent *bev, short events, void *arg)
     context->bev = NULL;
 }
 
-static void *_event_base_dispatch_loop(void *args)
+static void *_dispatch_loop(void *args)
 {
     _net_context_t *context = args;
 
@@ -106,11 +110,6 @@ static void *_event_base_dispatch_loop(void *args)
 
 static void _libevent_destroy(_net_context_t *context)
 {
-    if (context->id) {
-        event_base_loopexit(context->base, NULL);
-        pthread_join(context->id, NULL);
-    }
-
     if (context->bev) {
         bufferevent_free(context->bev);
     }
@@ -191,12 +190,6 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
                 _socket_write_cb, _socket_event_cb, context);
         bufferevent_enable(context->bev, EV_READ | EV_PERSIST);
 
-        if (0 != pthread_create(&context->id, NULL,
-                    _event_base_dispatch_loop, context)) {
-            LOGE("pthread_create faild \n");
-            break;
-        }
-
         _NET_STATE_CB(context, HY_NET_STATE_CONNECTING);
 
         return 0;
@@ -207,12 +200,34 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
     return -1;
 }
 
+static void _ctrl_c(int sock, short which, void* args)
+{
+    _net_context_t *context = (_net_context_t *)args;	
+
+#ifndef _TEST_SIGNAL
+    //如果处于非待决状态，则再次进入
+    if (!evsignal_pending(*context->signal_ev, NULL)) {
+        event_del(*context->signal_ev);
+        event_add(*context->signal_ev, NULL);
+    }
+#endif
+
+    if (context && context->config_save.signal_cb) {
+        context->config_save.signal_cb(sock, context->config_save.args);
+    }
+}
+
 void HyNetDestroy(void **handle)
 {
     LOGT("%s:%d \n", __func__, __LINE__);
     HY_ASSERT_NULL_RET(!handle || !*handle);
 
     _net_context_t *context = *handle;
+
+    if (context->id) {
+        event_base_loopexit(context->base, NULL);
+        pthread_join(context->id, NULL);
+    }
 
     _libevent_destroy(context);
 
@@ -233,6 +248,33 @@ void *HyNetCreate(HyNetConfig_t *net_config)
 
         if (0 != _libevent_create(context, net_config)) {
             LOGE("_libevent_create faild \n");
+            break;
+        }
+
+        struct event *signal = NULL;
+        context->signal_ev = &signal;
+
+#ifdef _TEST_SIGNAL
+        //evsignal_new隐藏的状态 EV_SIGNAL|EV_PERSIST，处于no pending
+        signal = evsignal_new(context->base, SIGINT, _ctrl_c, context);
+#else
+        //非持久信号，只进入一次, event_self_cbarg()传递当前的event
+        // signal = event_new(context->base, SIGINT, EV_SIGNAL, _ctrl_c, event_self_cbarg());
+        signal = event_new(context->base, SIGINT, EV_SIGNAL, _ctrl_c, context);
+#endif
+        if (!signal) {
+            LOGE("SIGINT evsignale_new failed! \n");
+            break;
+        }
+
+        //使事件处于pending状态
+        if (event_add(signal, 0) != 0) {
+            LOGE("SIGINT event_add failed! \n");
+            break;
+        }
+
+        if (0 != pthread_create(&context->id, NULL, _dispatch_loop, context)) {
+            LOGE("pthread_create faild \n");
             break;
         }
 
