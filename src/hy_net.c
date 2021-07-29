@@ -125,15 +125,48 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
     do {
 #ifdef _WIN32
         evthread_use_windows_threads();
-#endif
-#ifdef __GNUC__
+#elif __GNUC__
         evthread_use_pthreads();
+#else
+#error "use threads error"
 #endif
+
+#if 0
+        struct event_config* conf = event_config_new();
+
+        //set特征,设置了EV_FEATURE_FDS后其他特征就无法设置
+        //event_config_require_features(conf, EV_FEATURE_ET | EV_FEATURE_FDS);
+        //event_config_require_features(conf, EV_FEATURE_FDS);
+
+        /*通过‘避免’来取消epoll和poll的支持*/
+        event_config_avoid_method(conf, "epoll");
+        event_config_avoid_method(conf, "poll");
+
+        context->base = event_base_new_with_config(conf);
+        event_config_free(conf);
+#else
         context->base = event_base_new();
+#endif
         if (!context->base) {
             LOGE("event_base_new faild \n");
             break;
         }
+
+#if 1
+        LOGI("supported_methods: \n");
+        const char** methods = event_get_supported_methods();
+        for(int i = 0; methods[i] != NULL; i++) {
+            LOGI("\t%s \n", methods[i]);
+        }
+        LOGI("current method is: %s \n", event_base_get_method(context->base));
+
+        int f =	event_base_get_features(context->base);
+        if(f & EV_FEATURE_ET) {
+            LOGI("EV_FEATURE_ET events are supported. \n");
+        } else {
+            LOGI("EV_FEATURE_ET events are not supported. \n");
+        }
+#endif
 
         context->bev = bufferevent_socket_new(context->base,
                 -1, BEV_OPT_CLOSE_ON_FREE);
