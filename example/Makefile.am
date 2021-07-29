@@ -56,6 +56,14 @@ if COMPILE_SPEEXDSP
 _ldadd_com      += $(SPEEXDSP_LIBS)
 endif
 
+if COMPILE_LIBEVENT
+_ldadd_com      += $(EVENT_LIBS)
+endif
+
+if COMPILE_LIBEVENT_PTHREAD
+_ldadd_com      += $(EVENT_PTHREAD_LIBS)
+endif
+
 if COMPILE_LIBHY_UTILS
 _ldadd_com      += $(HY_UTILS_LIBS)
 endif

@@ -36,7 +36,9 @@ _ldadd_com      =
 # ---------------------
 _include_com    += -I$(top_srcdir)/include
 
-_sources_com    += hy_speex_aec.c
+_sources_com    += \
+                   hy_net.c \
+                   hy_speex_aec.c
 
 _cppflags_com   += \
                    $(CPPFLAGS_COM) \
