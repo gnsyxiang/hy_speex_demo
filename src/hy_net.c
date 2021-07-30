@@ -36,8 +36,8 @@
 #include "hy_utils/hy_log.h"
 
 #define ALONE_DEBUG 1
-
 #define _TEST_SIGNAL
+#define _READ_FRAME (1024)
 
 #define _NET_STATE_CB(context, state)                           \
     do {                                                        \
@@ -72,35 +72,19 @@ hy_s32_t HyNetWrite(void *handle, void *buf, hy_u32_t len)
     return len;
 }
 
-static void _client_read_cb(struct bufferevent *bev, void *arg)
-{
-    _net_context_t *context = arg;
-
-    char buf[1024] = {0}; 
-    size_t ret = bufferevent_read(bev, buf, sizeof(buf));
-
-    if (context->config_save.data_cb) {
-        context->config_save.data_cb(buf, ret, context->config_save.args);
-    }
-}
-
-static void _client_write_cb(struct bufferevent *bev, void *arg)
-{
-    LOGE("----haha-------------2\n");
-}
-
 static enum bufferevent_filter_result _client_filter_in_cb(
         struct evbuffer *src, struct evbuffer *dst,
         ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx)
 {
-    LOGI("client filter in \n");
+    char data[_READ_FRAME] = {0};
+    hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
-    char data[1024] = {0};
-    int len = evbuffer_remove(src, data, sizeof(data));
+    // 解密处理或者解缩处理
     hy_s32_t i;
-    for (i = 0; i < 1024; ++i) {
+    for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+
     evbuffer_add(dst, data, len);
 
     return BEV_OK;
@@ -110,20 +94,37 @@ static enum bufferevent_filter_result _client_filter_out_cb(
         struct evbuffer *src, struct evbuffer *dst,
         ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx)
 {
-    LOGI("client filter out \n");
+    char data[_READ_FRAME] = {0};
+    hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
-    char data[1024] = {0};
-    int len = evbuffer_remove(src, data, sizeof(data));
+    // 加密处理或者压缩处理
     hy_s32_t i;
-    for (i = 0; i < 1024; ++i) {
+    for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+
     evbuffer_add(dst, data, len);
 
     return BEV_OK;
 }
 
-static void _client_event_cb(struct bufferevent *bev, short events, void *arg)
+static void _client_read_cb(struct bufferevent *bev, void *arg)
+{
+    _net_context_t *context = arg;
+
+    char buf[_READ_FRAME] = {0}; 
+    size_t ret = bufferevent_read(bev, buf, sizeof(buf));
+
+    if (context->config_save.data_cb) {
+        context->config_save.data_cb(buf, ret, context->config_save.args);
+    }
+}
+
+static void _client_write_cb(struct bufferevent *bev, void *arg)
+{
+}
+
+static void _client_event_cb(struct bufferevent *bev, hy_s16_t events, void *arg)
 {
     _net_context_t *context = arg;
 
@@ -136,24 +137,24 @@ static void _client_event_cb(struct bufferevent *bev, short events, void *arg)
 
         _NET_STATE_CB(context, HY_NET_STATE_CONNECTED);
 
-        context->bev_filter = bufferevent_filter_new(context->bev,
-                _client_filter_in_cb,
-                _client_filter_out_cb,
+        context->bev_filter = bufferevent_filter_new(bev,
+                _client_filter_in_cb, _client_filter_out_cb,
                 BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS, 0, 0);
+        if (!context->bev_filter) {
+            LOGE("bufferevent_filter_new faild \n");
 
-        LOGE("----------haha: %p, %p \n", context->bev, context->bev_filter);
+            bufferevent_free(bev);
+            return ;
+        }
 
         bufferevent_setcb(context->bev_filter,
-                _client_read_cb,
-                _client_write_cb,
-                _client_event_cb,
-                context);
+                _client_read_cb, _client_write_cb, _client_event_cb, context);
         bufferevent_enable(context->bev_filter, EV_READ | EV_WRITE);
 
         return;
     }
 
-    bufferevent_free(context->bev);
+    bufferevent_free(bev);
     context->bev = NULL;
 }
 
@@ -170,6 +171,10 @@ static void *_dispatch_loop(void *args)
 
 static void _libevent_destroy(_net_context_t *context)
 {
+    if (context->bev_filter) {
+        bufferevent_free(context->bev_filter);
+    }
+
     if (context->bev) {
         bufferevent_free(context->bev);
     }
@@ -206,12 +211,12 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
 #if 1
         LOGI("supported_methods: \n");
         const char** methods = event_get_supported_methods();
-        for(int i = 0; methods[i] != NULL; i++) {
+        for(hy_s32_t i = 0; methods[i] != NULL; i++) {
             LOGI("\t%s \n", methods[i]);
         }
         LOGI("current method is: %s \n", event_base_get_method(context->base));
 
-        int f =	event_base_get_features(context->base);
+        hy_s32_t f = event_base_get_features(context->base);
         if(f & EV_FEATURE_ET) {
             LOGI("EV_FEATURE_ET events are supported. \n");
         } else {
@@ -250,7 +255,7 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
     return -1;
 }
 
-static void _ctrl_c(int sock, short which, void* args)
+static void _ctrl_c(hy_s32_t sock, hy_s16_t which, void* args)
 {
     _net_context_t *context = (_net_context_t *)args;	
 
