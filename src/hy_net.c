@@ -79,11 +79,13 @@ static enum bufferevent_filter_result _client_filter_in_cb(
     char data[_READ_FRAME] = {0};
     hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
+#if 0
     // 解密处理或者解缩处理
     hy_s32_t i;
     for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+#endif
 
     evbuffer_add(dst, data, len);
 
@@ -97,11 +99,13 @@ static enum bufferevent_filter_result _client_filter_out_cb(
     char data[_READ_FRAME] = {0};
     hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
+#if 0
     // 加密处理或者压缩处理
     hy_s32_t i;
     for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+#endif
 
     evbuffer_add(dst, data, len);
 

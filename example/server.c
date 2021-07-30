@@ -64,6 +64,8 @@ typedef struct {
 
     struct event_base   *base;
     struct evconnlistener* ev;
+    struct bufferevent* bev;
+    struct bufferevent* bev_filter;
 
     pthread_t           id;
 
@@ -78,11 +80,13 @@ static enum bufferevent_filter_result _filter_in_cb(
     char data[_READ_FRAME] = {0};
     hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
+#if 0
     // 解密处理或者解缩处理
     hy_s32_t i;
     for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+#endif
 
     evbuffer_add(dst, data, len);
 
@@ -96,11 +100,13 @@ static enum bufferevent_filter_result _filter_out_cb(
     char data[_READ_FRAME] = {0};
     hy_s32_t len = evbuffer_remove(src, data, sizeof(data));
 
+#if 0
     // 加密处理或者压缩处理
     hy_s32_t i;
     for (i = 0; i < _READ_FRAME; ++i) {
         data[i] = toupper(data[i]);
     }
+#endif
 
     evbuffer_add(dst, data, len);
 
@@ -112,7 +118,8 @@ static void _read_cb(struct bufferevent *bev, void *arg)
     char buf[_READ_FRAME] = {0}; 
     size_t ret = bufferevent_read(bev, buf, sizeof(buf));
 
-    LOGE("---------------haha: %s \n", buf);
+
+    LOGE("haha: %s \n", buf);
 }
 
 static void _write_cb(struct bufferevent *bev, void *arg)
@@ -126,27 +133,30 @@ static void _event_cb(struct bufferevent *bev, hy_s16_t events, void *arg)
     } else if(events & BEV_EVENT_ERROR) {
         LOGE("some other error \n");
     } else if(events & BEV_EVENT_CONNECTED) {
+        LOGE("----haha\n");
     } else {
         LOGE("others \n");
     }
 }
 
-static void listen_cb(struct evconnlistener* e, evutil_socket_t s, struct sockaddr* a, int socklen, void* arg)
+static void _listen_cb(struct evconnlistener* e, evutil_socket_t s, struct sockaddr* a, int socklen, void* arg)
 {
+    LOGI("client connect \n");
+
     _server_context_t *context = (_server_context_t *)arg;
 
-    struct bufferevent* bev = bufferevent_socket_new(context->base, s, BEV_OPT_CLOSE_ON_FREE);
+    context->bev = bufferevent_socket_new(context->base, s, BEV_OPT_CLOSE_ON_FREE);
 
-    struct bufferevent* bev_filter = bufferevent_filter_new(bev, 
+    context->bev_filter = bufferevent_filter_new(context->bev, 
             _filter_in_cb,
             _filter_out_cb,
             BEV_OPT_CLOSE_ON_FREE,
             0,
             0);
 
-    bufferevent_setcb(bev_filter, _read_cb, _write_cb, _event_cb, NULL);
+    bufferevent_setcb(context->bev_filter, _read_cb, _write_cb, _event_cb, NULL);
 
-    bufferevent_enable(bev_filter, EV_READ | EV_WRITE);
+    bufferevent_enable(context->bev_filter, EV_READ | EV_WRITE);
 }
 
 static void *_dispatch_loop(void *args)
@@ -185,7 +195,7 @@ static _server_context_t *_server_create(_server_config_t *server_config)
         serv.sin_port   = htons(server_config->port);
 
         context->ev = evconnlistener_new_bind(context->base,
-                listen_cb,
+                _listen_cb,
                 context,
                 LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE,
                 10,

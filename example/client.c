@@ -90,7 +90,8 @@ static _main_context_t *_module_create(void)
     aec_config.sample_rate      = 16000;
 
     HyNetConfig_t net_config;
-    net_config.ip               = "192.168.1.57";
+    net_config.ip               = "127.0.0.1";
+    // net_config.ip               = "192.168.1.57";
     net_config.port             = 7809;
     net_config.type             = HY_NET_TYPE_CLIENT;
     net_config.config_save.data_cb      = _net_data_cb;
@@ -117,6 +118,13 @@ int main(int argc, char const* argv[])
         LOGE("_module_create faild \n");
         return -1;
     }
+
+    while (context->net_state != HY_NET_STATE_CONNECTED) {
+        sleep(1);
+    }
+
+    #define _VOICE_START "ok"
+    HyNetWrite(context->net_handle, _VOICE_START, strlen(_VOICE_START));
 
     while (1) {
         #define _NET_TEST "1234567890abc"
