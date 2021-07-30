@@ -119,7 +119,11 @@ int main(int argc, char const* argv[])
     }
 
     while (1) {
+        #define _NET_TEST "1234567890abc"
+        HyNetWrite(context->net_handle, _NET_TEST, strlen(_NET_TEST));
+
         sleep(1);
+
         if (context->net_state == HY_NET_STATE_DISCONNECT) {
             LOGD("net disdconnect \n");
             break;

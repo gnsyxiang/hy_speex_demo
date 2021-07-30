@@ -20,12 +20,14 @@
 #include <stdio.h>
 #include <signal.h>
 #include <pthread.h>
+#include <ctype.h>
 
 #include "hy_net.h"
 
 #include <event2/event.h>
 #include <event2/bufferevent.h>
 #include <event2/thread.h>
+#include <event2/buffer.h>
 
 #include "hy_utils/hy_mem.h"
 #include "hy_utils/hy_string.h"
@@ -49,8 +51,10 @@ typedef struct {
 
     struct event_base   *base;
     struct bufferevent  *bev;
+    struct bufferevent  *bev_filter;
     pthread_t           id;
     struct event        **signal_ev;
+
 } _net_context_t;
 
 hy_s32_t HyNetWrite(void *handle, void *buf, hy_u32_t len)
@@ -58,10 +62,17 @@ hy_s32_t HyNetWrite(void *handle, void *buf, hy_u32_t len)
     HY_ASSERT_NULL_RET_VAL(!handle || !buf, -1);
     _net_context_t *context = handle;
 
-    return bufferevent_write(context->bev, buf, len);
+    if (!context->bev_filter) {
+        LOGE("do not connect server \n");
+        return -1;
+    }
+
+    bufferevent_write(context->bev_filter, buf, len);
+
+    return len;
 }
 
-static void _socket_read_cb(struct bufferevent *bev, void *arg)
+static void _client_read_cb(struct bufferevent *bev, void *arg)
 {
     _net_context_t *context = arg;
 
@@ -73,11 +84,46 @@ static void _socket_read_cb(struct bufferevent *bev, void *arg)
     }
 }
 
-static void _socket_write_cb(struct bufferevent *bev, void *arg)
+static void _client_write_cb(struct bufferevent *bev, void *arg)
 {
+    LOGE("----haha-------------2\n");
 }
 
-static void _socket_event_cb(struct bufferevent *bev, short events, void *arg)
+static enum bufferevent_filter_result _client_filter_in_cb(
+        struct evbuffer *src, struct evbuffer *dst,
+        ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx)
+{
+    LOGI("client filter in \n");
+
+    char data[1024] = {0};
+    int len = evbuffer_remove(src, data, sizeof(data));
+    hy_s32_t i;
+    for (i = 0; i < 1024; ++i) {
+        data[i] = toupper(data[i]);
+    }
+    evbuffer_add(dst, data, len);
+
+    return BEV_OK;
+}
+
+static enum bufferevent_filter_result _client_filter_out_cb(
+        struct evbuffer *src, struct evbuffer *dst,
+        ev_ssize_t dst_limit, enum bufferevent_flush_mode mode, void *ctx)
+{
+    LOGI("client filter out \n");
+
+    char data[1024] = {0};
+    int len = evbuffer_remove(src, data, sizeof(data));
+    hy_s32_t i;
+    for (i = 0; i < 1024; ++i) {
+        data[i] = toupper(data[i]);
+    }
+    evbuffer_add(dst, data, len);
+
+    return BEV_OK;
+}
+
+static void _client_event_cb(struct bufferevent *bev, short events, void *arg)
 {
     _net_context_t *context = arg;
 
@@ -89,6 +135,20 @@ static void _socket_event_cb(struct bufferevent *bev, short events, void *arg)
         LOGI("connect to the server \n");
 
         _NET_STATE_CB(context, HY_NET_STATE_CONNECTED);
+
+        context->bev_filter = bufferevent_filter_new(context->bev,
+                _client_filter_in_cb,
+                _client_filter_out_cb,
+                BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS, 0, 0);
+
+        LOGE("----------haha: %p, %p \n", context->bev, context->bev_filter);
+
+        bufferevent_setcb(context->bev_filter,
+                _client_read_cb,
+                _client_write_cb,
+                _client_event_cb,
+                context);
+        bufferevent_enable(context->bev_filter, EV_READ | EV_WRITE);
 
         return;
     }
@@ -122,14 +182,6 @@ static void _libevent_destroy(_net_context_t *context)
 static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_config)
 {
     do {
-#ifdef _WIN32
-        evthread_use_windows_threads();
-#elif __GNUC__
-        evthread_use_pthreads();
-#else
-#error "use threads error"
-#endif
-
 #if 0
         struct event_config* conf = event_config_new();
 
@@ -167,17 +219,19 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
         }
 #endif
 
-        context->bev = bufferevent_socket_new(context->base,
-                -1, BEV_OPT_CLOSE_ON_FREE);
+        context->bev = bufferevent_socket_new(context->base, -1, BEV_OPT_CLOSE_ON_FREE);
         if (!context->bev) {
             LOGE("bufferevent_socket_new faild \n");
             break;
         }
 
+        bufferevent_enable(context->bev, EV_READ | EV_WRITE);
+        bufferevent_setcb(context->bev, NULL, NULL, _client_event_cb, context);
+
         struct sockaddr_in serv;
         memset(&serv, 0, sizeof(serv));
         serv.sin_family = AF_INET;
-        serv.sin_port = htons(net_config->port);
+        serv.sin_port   = htons(net_config->port);
         evutil_inet_pton(AF_INET, net_config->ip, &serv.sin_addr.s_addr);
 
         if (0 != bufferevent_socket_connect(context->bev,
@@ -185,10 +239,6 @@ static hy_s32_t _libevent_create(_net_context_t *context, HyNetConfig_t *net_con
             LOGE("bufferevent_socket_connect faild \n");
             break;
         }
-
-        bufferevent_setcb(context->bev, _socket_read_cb,
-                _socket_write_cb, _socket_event_cb, context);
-        bufferevent_enable(context->bev, EV_READ | EV_PERSIST);
 
         _NET_STATE_CB(context, HY_NET_STATE_CONNECTING);
 
@@ -272,6 +322,14 @@ void *HyNetCreate(HyNetConfig_t *net_config)
             LOGE("SIGINT event_add failed! \n");
             break;
         }
+
+#ifdef _WIN32
+        evthread_use_windows_threads();
+#elif __GNUC__
+        evthread_use_pthreads();
+#else
+#error "use threads error"
+#endif
 
         if (0 != pthread_create(&context->id, NULL, _dispatch_loop, context)) {
             LOGE("pthread_create faild \n");
